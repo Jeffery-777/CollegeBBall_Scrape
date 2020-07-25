@@ -1,0 +1,533 @@
+---
+title: "College Scrape Github Code"
+author: "Jeff Henderson"
+date: "7/25/2020"
+output: html_document
+---
+# Load up the forces
+```{r}
+library(rvest)
+library(curl)
+library(tidyverse)
+library(httr)
+```
+
+# Scrape all college players with last names starting with all letters. The site structures their url for last name letter in url_names below in place of (xxx)
+```{r}
+
+# make one for every players name to create url index
+url_names <- "https://www.sports-reference.com/cbb/players/xxx-index.html"
+
+letters <- c("a","b","c","d","e","f","g","h","i","j",
+             "k","l","m","n","o","p","q","r","s","t",
+             "u","v","w","x","y","z")
+
+# Make a url for each starting letter a-z
+url_all <- map(.x = letters,
+            .f = function(x){gsub(x = url_names, pattern = "xxx", 
+                                  replacement = x)}) %>% 
+  unlist
+
+numbers <- c(1:26)
+
+
+# Scrape all names for last name starting with A
+all_names <- map_dfr(.x = numbers,
+    .f = function(xxx) {read_html(curl(url_all[xxx], handle = curl::new_handle("useragent" = "Mozilla/5.0"))) %>% 
+  html_nodes("p > a") %>%
+  html_text() %>%
+  as.data.frame() %>%
+  setNames("name")})
+
+# make first and last name column from all_names
+all_names2 <- separate(all_names, name, into = c("first", "last", "extra"), sep = " ") %>%
+  mutate(first = gsub("\\.", "", first),
+         last = gsub("\\.", "", last)) %>%
+  mutate(first = gsub("\\'", "", first),
+         last = gsub("\\'", "", last)) %>%
+  mutate_all(tolower) 
+
+# combine middle names that appear in url
+all_names2$extra[is.na(all_names2$extra)] <- ""
+
+all_names2 <- all_names2 %>%
+  mutate(lnamecombo = paste0(last, extra))
+```
+
+# Create URL for all active names created in above chunk
+```{r}
+# starting point for Url compilation
+scaffold <- "https://www.sports-reference.com/cbb/players/{fname}-{lnameb}-{repname#}.html" 
+
+scaffold2 <- map(.x = all_names2$first,
+                 .f = function(x){gsub(x = scaffold, pattern = "\\{fname\\}", 
+                                       replacement = x)}) %>% 
+  unlist %>%
+  as.data.frame() %>%
+  setNames("name")
+
+all_names2$urlfirst <- scaffold2$name
+
+# bring last name into the url scaffold
+all_names2 <-  all_names2 %>%
+  mutate(urlfirst_last = str_replace(urlfirst, "\\{lnameb\\}", lnamecombo))
+
+# ok now we do need to map each name with a number 1 - 15. this will account for players with the same exact first and last name. the site uses 1-x(number of players). I looked up the most common name I could find, I foget what, and I think it was 13 players with that name. So I went with 15. Any over and above is fine as it will be filtered out later.
+
+scaffold3 <- map(.x = c(1:15),
+                 .f = function(x){gsub(x = all_names2$urlfirst_last, pattern = "\\{repname#\\}", 
+                                       replacement = x)}) %>% 
+  unlist %>%
+  as.data.frame() %>%
+  setNames("full_path")
+
+scaffold3$full_path <- as.character(scaffold3$full_path)
+```
+
+# Very long url active check process. I don't recomend doing this. just take the rds I made following. 
+```{r}
+# OK, Now we have 1.5 million possible urls. We don't know if they are active yet. This part sucks. It takes forever. 
+
+library(doParallel)
+cl <- makePSOCKcluster(4)
+registerDoParallel(cl)
+memory.limit(56000)
+#long run below
+
+
+check_link1 <- sapply(scaffold3$full_path[1:100000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link1, file = "piece1.rds")
+
+check_link2 <- sapply(scaffold3$full_path[100001:200000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link2, file = "piece2.rds")
+
+check_link3 <- sapply(scaffold3$full_path[200001:300000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link3, file = "piece3.rds")
+
+check_link4 <- sapply(scaffold3$full_path[300001:400000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link4, file = "piece4.rds")
+
+check_link5 <- sapply(scaffold3$full_path[400001:500000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link5, file = "piece5.rds")
+
+
+check_link6 <- sapply(scaffold3$full_path[500001:600000], http_error) %>%
+  as.data.frame()   
+
+saveRDS(check_link6, file = "piece6.rds")
+
+check_link7 <- sapply(scaffold3$full_path[600001:700000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link7, file = "piece7.rds")
+
+check_link8 <- sapply(scaffold3$full_path[700001:800000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link8, file = "piece8.rds")
+
+check_link9 <- sapply(scaffold3$full_path[800001:900000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link9, file = "piece9.rds")
+
+check_link10 <- sapply(scaffold3$full_path[900001:1000000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link10, file = "piece10.rds")
+
+
+check_link11 <- sapply(scaffold3$full_path[1000001:1100000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link11, file = "piece11.rds")
+
+
+check_link12 <- sapply(scaffold3$full_path[1100001:1200000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link12, file = "piece12.rds")
+
+
+check_link13 <- sapply(scaffold3$full_path[1200001:1300000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link13, file = "piece13.rds")
+
+
+check_link14 <- sapply(scaffold3$full_path[1300001:1350000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link14, file = "piece14.rds")
+
+check_link15 <- sapply(scaffold3$full_path[1350001:1400000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link15, file = "piece15.rds")
+
+check_link16 <- sapply(scaffold3$full_path[1400001:1450000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link16, file = "piece16.rds")
+
+check_link17 <- sapply(scaffold3$full_path[1450001:1500000], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link17, file = "piece17.rds")
+
+check_link18 <- sapply(scaffold3$full_path[1500001:1579260], http_error) %>%
+  as.data.frame() 
+
+saveRDS(check_link18, file = "piece18.rds")
+
+stopCluster(cl)
+
+# Combine all this bs together
+check_link_all <- bind_rows(piece1,
+                            check_link2,
+                            piece3,
+                            piece4,
+                            piece5,
+                            piece6,
+                            piece7,
+                            piece8,
+                            piece9,
+                            piece10,
+                            piece11,
+                            piece12,
+                            piece13,
+                            piece14,
+                            piece15,
+                            piece16,
+                            piece17,
+                            piece18)
+
+# this eliminates inacitve urls. the checks above marked those who erred as TRUE, therefore, we don't want those - we want the fales only
+link_hit_index <- which(check_link_all == FALSE)
+
+# now use the index to filter through all the possible urls and keep active ones only. save as rds for safekeeping
+url_final <- scaffold3$full_path[link_hit_index]  
+
+# Save this and never even look at the any of this code above ever again.
+saveRDS(url_final, file = "all_active_urls.rds")
+
+# Just to be sure this is no longer a df and just a vector ready for map function
+url_final <- as.character(url_final) %>%
+  pull()
+
+```
+
+# Scrape with acitve URLS all set and save rds for each section
+
+```{r}
+# OK now the funnnn? part?
+
+# I broke this up into sections because my computer got depressed with the work and hung itself so many times otherwise. 
+
+#just for ref - here are all the sections in this chunk:
+
+# section 1: scrape_UPTO_5k
+# section 2: scrape_UPTO_10k
+# section 3: scrape_10k_50k 
+# section 4: scrape_50k_70k 
+# section 5: scrape_70k_100k
+# section 6: scrape_100_end
+
+# section 1
+scrape_UPTO_5k <- map(.x = url_final[1:5000],
+                .f = function(x){Sys.sleep(.3); cat(1);       
+                  webpage <- read_html(curl(x, handle = new_handle("useragent"="Mozilla/5.0"))) 
+                  
+                  first <- tryCatch({webpage %>% 
+                    html_nodes("#meta :nth-child(1)") %>%
+                    html_text() %>% 
+                    .[[1]] %>% 
+                    tibble(text = .)}, error = function(e) 
+                    {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                  
+                  second <- tryCatch({webpage %>% 
+                      html_table() %>% 
+                      .[[1]] %>%
+                      select(1) %>%
+                      mutate(name = str_extract(string = x, 
+                                                pattern = "(?<=cbb/players/).*?(?=-\\d\\.html)"))
+                  }, error = function(e) 
+                  {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                  tibble(first, second)
+                })
+
+
+# section 2
+scrape_UPTO_10k <- map(.x = url_final[5001:10000],
+                      .f = function(x){Sys.sleep(.3); cat(1);       
+                        webpage <- read_html(curl(x, handle = new_handle("useragent"="Mozilla/5.0"))) 
+                        
+                        first <- tryCatch({webpage %>% 
+                            html_nodes("#meta :nth-child(1)") %>%
+                            html_text() %>% 
+                            .[[1]] %>% 
+                            tibble(text = .)}, error = function(e) 
+                            {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                        
+                        second <- tryCatch({webpage %>% 
+                            html_table() %>% 
+                            .[[1]] %>%
+                            select(1) %>%
+                            mutate(name = str_extract(string = x, 
+                                                      pattern = "(?<=cbb/players/).*?(?=-\\d\\.html)"))
+                        }, error = function(e) 
+                        {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                        tibble(first, second)
+                      })
+
+save(scrape_UPTO_5k, file="scrape1.RData")
+save(scrape_UPTO_10k, file="scrape2.RData")
+
+# section 3
+
+scrape_10k_50k <- map(.x = url_final[10001:50000],
+                       .f = function(x){Sys.sleep(.3); cat(1);       
+                         webpage <- read_html(curl(x, handle = new_handle("useragent"="Mozilla/5.0"))) 
+                         
+                         first <- tryCatch({webpage %>% 
+                             html_nodes("#meta :nth-child(1)") %>%
+                             html_text() %>% 
+                             .[[1]] %>% 
+                             tibble(text = .)}, error = function(e) 
+                             {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                         
+                         second <- tryCatch({webpage %>% 
+                             html_table() %>% 
+                             .[[1]] %>%
+                             select(1) %>%
+                             mutate(name = str_extract(string = x, 
+                                                       pattern = "(?<=cbb/players/).*?(?=-\\d\\.html)"))
+                         }, error = function(e) 
+                         {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                         tibble(first, second)
+                       })        
+
+save(scrape_10k_50k, file="scrape3.RData")
+scrape3 <- map_dfr(scrape_10k_50k, ~do.call(cbind, .x))
+
+
+
+# section 4
+scrape_50k_70k <- map(.x = url_final[50001:70000],
+                      .f = function(x){Sys.sleep(.3); cat(1);       
+                        webpage <- read_html(curl(x, handle = new_handle("useragent"="Mozilla/5.0"))) 
+                        
+                        first <- tryCatch({webpage %>% 
+                            html_nodes("#meta :nth-child(1)") %>%
+                            html_text() %>% 
+                            .[[1]] %>% 
+                            tibble(text = .)}, error = function(e) 
+                            {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                        
+                        second <- tryCatch({webpage %>% 
+                            html_table() %>% 
+                            .[[1]] %>%
+                            select(1) %>%
+                            mutate(name = str_extract(string = x, 
+                                                      pattern = "(?<=cbb/players/).*?(?=-\\d\\.html)"))
+                        }, error = function(e) 
+                        {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                        tibble(first, second)
+                      })  
+
+
+save(scrape_50k_70k, file="scrape4.RData")
+
+# section 5
+scrape_70k_100k <- map(.x = url_final[70001:100000],
+                      .f = function(x){cat(1);       
+                        webpage <- read_html(curl(x, handle = new_handle("useragent"="Mozilla/5.0"))) 
+                        
+                        first <- tryCatch({webpage %>% 
+                            html_nodes("#meta :nth-child(1)") %>%
+                            html_text() %>% 
+                            .[[1]] %>% 
+                            tibble(text = .)}, error = function(e) 
+                            {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                        
+                        second <- tryCatch({webpage %>% 
+                            html_table() %>% 
+                            .[[1]] %>%
+                            select(1) %>%
+                            mutate(name = str_extract(string = x, 
+                                                      pattern = "(?<=cbb/players/).*?(?=-\\d\\.html)"))
+                        }, error = function(e) 
+                        {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                        tibble(first, second)
+                      })        
+save(scrape_70k_100k, file="scrape5.RData")
+
+
+#section 6
+scrape_100_end <- map(.x = url_final[100001:157288],
+                       .f = function(x){cat(1);       
+                         webpage <- read_html(curl(x, handle = new_handle("useragent"="Mozilla/5.0"))) 
+                         
+                         first <- tryCatch({webpage %>% 
+                             html_nodes("#meta :nth-child(1)") %>%
+                             html_text() %>% 
+                             .[[1]] %>% 
+                             tibble(text = .)}, error = function(e) 
+                             {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                         
+                         second <- tryCatch({webpage %>% 
+                             html_table() %>% 
+                             .[[1]] %>%
+                             select(1) %>%
+                             mutate(name = str_extract(string = x, 
+                                                       pattern = "(?<=cbb/players/).*?(?=-\\d\\.html)"))
+                         }, error = function(e) 
+                         {message('Skipping url', x);return(tibble(Season = NA, name = NA))})
+                         tibble(first, second)
+                       })  
+
+save(scrape_100_end, file="scrape6.RData")
+```
+
+# Wrangle the Scrape
+```{r}
+# I have all the scrapes loaded (hopefully) in the repo, so this should pull the results without having to actually scrape
+
+part1 <- get(load("C:/Users/ASUS/Desktop/NBA Scrape Project/NBA Scrape Project/scrape1.RData"))
+part2 <- get(load("C:/Users/ASUS/Desktop/NBA Scrape Project/NBA Scrape Project/scrape2.RData"))
+part3 <- get(load("C:/Users/ASUS/Desktop/NBA Scrape Project/NBA Scrape Project/scrape3.RData"))
+part4 <- get(load("C:/Users/ASUS/Desktop/NBA Scrape Project/NBA Scrape Project/scrape4.RData"))
+part5 <- get(load("C:/Users/ASUS/Desktop/NBA Scrape Project/NBA Scrape Project/scrape5.RData"))
+part6 <- get(load("C:/Users/ASUS/Desktop/NBA Scrape Project/NBA Scrape Project/scrape6.RData"))
+```
+
+# Create data frames from the rdata list files
+```{r}
+# For each loaded rdata file, we need to transcribe them into data frames with all the data prior to cleaning
+
+df1 <- map_dfr(part1, ~do.call(cbind, .x))
+df2 <- map_dfr(part2, ~do.call(cbind, .x)) %>%
+  select(1:3)
+df3 <- map_dfr(part3, ~do.call(cbind, .x))%>%
+  select(1:3)
+df4 <- map_dfr(part4, ~do.call(cbind, .x))%>%
+  select(1:3)
+df5 <- map_dfr(part5, ~do.call(cbind, .x))%>%
+  select(1:3)
+df6 <- map_dfr(part6, ~do.call(cbind, .x))%>%
+  select(1:3)
+
+all <- bind_rows(df1, df2, df3, df4, df5, df6)
+colnames(all) <- c("data", "season", "player")
+```
+
+
+# Clean the data frame
+```{r}
+# with a final data frame created we have an entry for each player and each year. 
+
+# this will take a bit to run - we need to parse out height from the data column as well as college. And why not, hometown too.
+all_cleaned <- all %>%
+    mutate(position = str_extract(data, "(?<=Position:\n  \n  ).*?(?=\n\n\n\n  \\d-\\d)")) %>%
+  mutate(height = str_extract(data, "(?<=\\w\n{4}\\s{2}).*?(?=,\\s+\\d{3}lb|\\s+\\(\\d+)")) %>%
+  separate(height, into = c("ft", "inch"), sep = "-") %>%
+  #get rid of few oddball ones that returned weight
+  mutate_at("ft", as.numeric) %>%
+  filter(ft > 3 & ft < 10) %>%
+  mutate(name = str_extract(data, "(?<=^\n).*?(?=\n\t\n\n)")) %>%
+  mutate(college = str_extract(data, "(?<=Schools?: ).*?(?=\n\n\n\n\n\n  More|   More player info)"))%>%
+  mutate(hometown = str_extract(data, "(?<=Hometown: ).*?(?=\n)")) %>%
+  select(name, season, ft, inch, college, hometown) %>%
+  #theres a weird tab in fron of the names so take that out
+  mutate(name = gsub(pattern = "\t", replacement = "", x = name))
+
+
+# This ultimately filters the data so that only the final year of each player's college career is retained. This allows a final data base to which a join using player name and college can be used with an NBA data table to see who made the nba and who didn't from the college table
+all_cleaned_final_year <- all_cleaned %>%
+  filter(season != "Career") %>%
+  separate(season, into = c("beg","end"), sep = "-") %>%
+  mutate_at(c("beg", "end", "inch"), as.numeric) %>%
+  mutate(end = beg + 1) %>%
+  arrange(name) %>%
+  mutate(player_code = paste0(name,ft,inch,college)) %>%
+  mutate(player_code = str_replace_all(player_code, " ", "")) %>%
+  group_by(player_code) %>%
+  arrange(desc(end)) %>%
+  slice(1)
+
+# if you want all the data including each year for each college player
+saveRDS(all_cleaned, file = "clg_player_name_height.rds")
+
+# data on just final year for college players
+saveRDS(all_cleaned_final_year, file = "clg_player_name_height_filtered.rds")
+```
+
+
+# College Scrape over - Now join with Nba data table
+
+```{r}
+#make one for every players name to create url index
+nba_names <- "https://www.basketball-reference.com/players/xxx/"
+
+letters <- c("a","b","c","d","e","f","g","h","i","j",
+             "k","l","m","n","o","p","q","r","s","t",
+             "u","v","w","x","y","z")
+
+nba_url_all <- map(.x = letters,
+            .f = function(x){gsub(x = nba_names, pattern = "xxx", 
+                                  replacement = x)}) %>% 
+  unlist
+
+numbers <- c(1:26)
+
+all_nba_names <- map_dfr(.x = numbers,
+    .f = function(xxx) {read_html(curl(nba_url_all[xxx], handle = curl::new_handle("useragent" = "Mozilla/5.0"))) %>% 
+                       html_nodes("table") %>% 
+                       html_table(fill = T) %>%
+                       .[[1]] 
+      })
+
+saveRDS(all_names, file = "all_nba_players_through_2020.rds")
+
+```
+
+# NBA scrape done - now join college table and nba table
+
+```{r}
+# create the piece we will join to college table
+nba_join <- all_nba_names %>%
+  select(Player, Colleges) %>%
+  mutate(Player = gsub(x = Player, pattern = "\\*", replacement = "")) %>%
+  mutate(nba = 1)
+
+# this join was the best I could think of but is not without data loss. Many players attended multiple colleges and the nba table doesn't match the college table. There is likley room for improvement here but all in all, most of the data is still retained so as to be representative:
+
+nba_col_joined <- all_cleaned_final_year %>%
+  left_join(nba_join, by = c("name" = "Player", "college" = "Colleges")) %>%
+  mutate(made_nba = if_else(is.na(nba), 0, 1)) %>%
+  arrange(desc(ft), desc(inch)) %>%
+  select(-nba)
+```
+
+# Now, finally, the moment all this was fore. Get percentage of making nba for each height
+```{r}
+# quick note - I think I added Spud Webb manually as he attended multiple colleges and is a notable shorty that had to be included.
+
+make.nba.by.height2 <- nba_col_joined %>%
+  ungroup() %>%
+  filter(end > 1992) %>%
+  group_by(ft, inch) %>%
+  mutate(height = (ft * 12) + inch) %>%
+  summarise(make_nba_pct = mean(made_nba, na.rm = T), n = n()) 
+```
+
